@@ -9,7 +9,7 @@ This repository contains the implementation of a deep-learning multi-task (DL-MT
 
 The framework uses the upstream discharge hydrograph as the online input. Variable-specific empirical orthogonal function (EOF) bases provide compact spatial representations, while a shared temporal network predicts the corresponding modal coefficients. The model jointly reconstructs water depth and two horizontal velocity components.
 
-The hydraulic reference data were generated using the two-dimensional hydrodynamic model HEC-RAS version 6.6.
+The hydraulic reference data were generated using the two-dimensional hydrodynamic model HEC-RAS version 6.6.[https://www.hec.usace.army.mil/software/hec-ras/download.aspx]
 
 ## Main features
 
