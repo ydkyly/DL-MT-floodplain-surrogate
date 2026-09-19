@@ -1,7 +1,7 @@
 # DL-MT-floodplain-surrogate
 A discharge-driven low-rank surrogate model for predicting two-dimensional floodplain hydrodynamics
 
-> Training dataset: The training dataset used in this study is available on [Zenodo](10.5281/zenodo.22831693).
+> Training dataset: The training dataset used in this study is available on [Zenodo][10.5281/zenodo.22831693]
 
 ## Overview
 
