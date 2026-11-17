@@ -7,7 +7,6 @@ Python implementation accompanying the manuscript by Yanbin Qiu and co-authors.
 - **Source code:** [GitHub repository](https://github.com/ydkyly/DL-MT-floodplain-surrogate)
 - **Dataset reference:** [Zenodo, DOI: 10.5281/zenodo.22831693](https://doi.org/10.5281/zenodo.22831693)
 - **Software licence:** [MIT](LICENSE)
-- **Contact:** Tao Yang, tao.yang@hhu.edu.cn
 
 ## Overview
 
