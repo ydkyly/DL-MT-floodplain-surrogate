@@ -1,56 +1,82 @@
 # DL-MT Floodplain Surrogate
 
-A discharge-driven low-rank framework for joint prediction of flood depth and velocity to support rapid flood warning.
+Code for **A discharge-driven low-rank framework for joint prediction of flood depth and velocity to support rapid flood warning**.
 
-The framework converts upstream discharge hydrographs and their derived features into time-resolved depth and horizontal velocity fields for a fixed domain and prescribed hydraulic conditions. HEC-RAS 6.6 supplies the hydraulic reference data. Variable-specific EOF bases are constructed offline; a shared ResNet or TCN predicts modal coefficients for field reconstruction.
+DL-MT reconstructs time-varying water-depth and velocity fields from upstream discharge hydrographs for a fixed domain and prescribed hydraulic conditions. Variable-specific EOF bases provide low-rank spatial representations, and a shared Res-MT or TCN-MT network predicts modal coefficients for field reconstruction.
 
-Dataset: [Zenodo](https://doi.org/10.5281/zenodo.22831693)
+- Data: [Zenodo](https://doi.org/10.5281/zenodo.22831693)
+- Licence: [MIT](LICENSE)
 
-## Requirements
+## Installation
 
-Python 3.10 or later, PyTorch, NumPy, pandas, openpyxl, h5py, scikit-learn, matplotlib, scipy, tqdm, rasterio, and pyproj. CUDA is optional for training; inference defaults to CPU.
+Use Python 3.10 or later. Install PyTorch for your CPU or CUDA environment, then install the remaining dependencies:
 
-## Workflow
+```bash
+pip install torch numpy pandas openpyxl h5py scikit-learn scipy matplotlib tqdm rasterio pyproj
+```
 
-Run commands from the directory containing `flood_main.py`. Replace all example paths with your own; source-code defaults include local development paths.
+Run commands from the repository directory containing `flood_main.py`. CPU inference is supported; a CUDA GPU can be used for training. The manuscript experiments used an NVIDIA RTX 3090 with 24 GB memory for training and an Intel Xeon Platinum 8168 CPU for inference.
 
-1. **Prepare data.** Use separate event sets for training, validation, and testing. Inputs are Excel feature matrices (24 time steps by 26 features), with filenames matching the hydraulic reference event IDs. HDF dataset paths are defined in `function/paths.py`.
-2. **Build bases from training events only.** Repeat for depth, velocity X, and velocity Y using the corresponding HEC-RAS dataset path.
+## Inputs and outputs
+
+- **Inputs:** one header-free Excel file per event, containing the prepared input features with 24 rows and 26 columns. Use numeric event filenames, such as `01.xlsx`.
+- **Reference fields:** matching HEC-RAS HDF files, such as `01.hdf`, containing depth and the two horizontal velocity components. Dataset paths are configured in `function/paths.py`.
+- **Model files:** trained checkpoint, variable-specific EOF bases and mean fields, and training-set normalisation statistics.
+- **Outputs:** reconstructed depth and velocity fields in NPY format, with evaluation and plotting utilities.
+
+Use separate training, validation and test events. Construct EOF bases and normalisation statistics from training events only. Replace the uppercase placeholders below with your own file or directory paths.
+
+## Basic workflow
+
+### 1. Build EOF bases
+
+Run this command separately for depth and both velocity components, using each variable's HDF dataset path and output directory:
 
 ```bash
 python flood_main.py build-basis-svd --hdf_dir TRAIN_HDF --data_path "HDF_DATASET_PATH" --rank_k 256 --save BASIS_DIRECTORY
 ```
 
-3. **Train and validate.** Supply the three variable-specific bases. Each run saves its configuration, checkpoint, and training normalisation statistics.
+### 2. Train
 
 ```bash
 python flood_main.py train --inflow TRAIN_INPUT --HDF5 TRAIN_HDF --val_inflow VAL_INPUT --val_hdf5 VAL_HDF --depth_basis DEPTH_BASIS --vx_basis VX_BASIS --vy_basis VY_BASIS --backbone tcn --tasks depth,flow --save_dir RUNS
 ```
 
-4. **Reconstruct independent events on CPU.** Match the backbone and basis settings to the checkpoint. Use `--device cuda` or `--device auto` only when a different execution device is intended.
+Training saves the configuration, checkpoint and normalisation statistics. Backbone options are listed by `python flood_main.py train --help`.
+
+### 3. Reconstruct hydraulic fields
 
 ```bash
 python flood_main.py infer --inflow TEST_INPUT --checkpoint CHECKPOINT --norm_stats TRAIN_NORM_NPZ --depth_basis DEPTH_BASIS --vx_basis VX_BASIS --vy_basis VY_BASIS --mean_depth DEPTH_MEAN --mean_vx VX_MEAN --mean_vy VY_MEAN --backbone tcn --device cpu --output_dir PREDICTIONS
 ```
 
-5. **Evaluate and visualise.** Depth, velocity-component, and speed predictions are saved as NPY arrays. Provide the matching HEC-RAS geometry and reference data for maps and metrics.
+Use the backbone, bases and normalisation statistics associated with the checkpoint.
+
+### 4. Evaluate and visualise
 
 ```bash
 python flood_main.py viz --pred_dir PREDICTIONS --gt_dir TEST_HDF --geom_hdf GEOMETRY_HDF --threshold 0.1 --output_dir FIGURES
 ```
 
-Use `python flood_main.py COMMAND --help` for all options. Optional analysis and preprocessing scripts are in `assit_code/`.
+Use `python flood_main.py COMMAND --help` to view the options for each command.
 
-## Configuration
+## Parameters
 
-- Wet/dry depth threshold: 0.1 m. The event-envelope speed classification threshold is 0.1 m/s; plotting visibility thresholds are separate.
-- Default TCN: three temporal blocks with 64 channels each and dilation factors 1, 2, and 4; each block contains two dilated convolutions.
-- Restored depth-weighted-loss defaults: alpha = 0.5, gamma = 1.0, Huber delta = 0.1 m, clipping quantile = 0.999, and no warmup. The dry-region coefficient is 0.5.
-- The restored loss defaults are a configuration for validation, not a claim that existing checkpoints or manuscript metrics were produced with these settings. Use recorded experiment configurations to reproduce published results.
-- CPU inference is available through `--device cpu` or `function.infer.batch_infer_cpu(args)`. Report timing together with the execution device and measurement scope; the current event timer includes input reading, reconstruction, and output saving.
+| Parameter | Code default |
+|---|---|
+| EOF rank | 256 per variable |
+| Initial learning rate | 0.001 |
+| Batch size | 4 |
+| Maximum epochs / early-stopping patience | 500 / 30 |
+| Wet/dry depth threshold | 0.1 m |
+| TCN channels / dilation factors | 64, 64, 64 / 1, 2, 4 |
+| TCN kernel size / dropout | 3 / 0.2 |
+| Depth-weighted loss coefficient / exponent | 0.5 / 1.0 |
+| Huber delta / weight-clipping quantile | 0.1 m / 0.999 |
+| Dry-region penalty coefficient | 0.5 |
 
-## Citation and licence
+The manuscript examines dry-region penalty coefficients of **0, 0.25, 0.5, 0.75, 1 and 2**, and training-set sizes of **20, 40, 60, 80 and 100 events**, with fixed validation and test sets of 10 events each.
 
-For now, cite the associated manuscript as an unpublished manuscript and cite the dataset DOI above. Update this entry with the article DOI after publication.
+## Citation
 
-Code licence: MIT; see the repository's `LICENSE` file. The dataset licence is specified in its Zenodo record.
+Qiu, Y., et al. *A discharge-driven low-rank framework for joint prediction of flood depth and velocity to support rapid flood warning*. Manuscript. Please also cite the dataset DOI when using the data.
